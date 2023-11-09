@@ -15,6 +15,7 @@ library(readr)
 library(tidyverse)
 library(dplyr)
 library(broom)
+library(ggplot2)
 ```
 
 #### Problem 2
@@ -34,12 +35,32 @@ tidynames = function(x) {
   x = gsub(".csv$", "", x)
 }
 
+# dataframe with id and results columns
 tidy_data = 
   data |>
   mutate(id = map(file_name, basename)) |>
   mutate(id = map(id, tidynames)) |>
   select(-file_name) |>
   select(id, result) 
+
+# unlist results columns
+unlist_tidydata = 
+  tidy_data |>
+  unnest_wider(result) |>
+  pivot_longer(cols = starts_with("week_"), 
+               names_to = "week",
+               values_to = "value") |>
+  mutate(id = as.character(id))
+
+df = 
+  as.data.frame(unlist_tidydata) |>
+  na.omit()
+
+ggplot(df, aes(x = week, y = value, group = as.factor(id), color = as.factor(id))) +
+  geom_line() +
+  labs(x = "Week", y = "Value", title = "Spaghetti Plot") +
+  theme_minimal()
+
 
 ```
 
@@ -49,7 +70,7 @@ set.seed(1)
 n = 30
 sigma = 5
 alpha = 0.05
-true_mu_values = c(0, 1, 2, 3, 4, 5, 6)
+true_mu_values = 0
 num_simulations = 5000
 
 # Function to perform one simulation
@@ -66,10 +87,15 @@ sim_one = function(true_mu) {
         estimate = tidy(t.test(x, mu = 0))$estimate,
         p_value = tidy(t.test(x, mu = 0))$p.value
         )
-  
-  # Return estimate and p-value
-  return(sim_data)
 }
+
+output = vector("list", 5000)
+
+for (i in 1:5000) {
+  output[[i]] = sim_one(30)
+}
+
+sim_results = bind_rows(output)
 
 simulation_results =
   map_dfr(true_mu_values, ~ {
@@ -78,13 +104,6 @@ simulation_results =
   return(simulations)
 })
 
-# output = vector("list", 5000)
-
-# for (i in 1:5000) {
-#   output[[i]] = sim_mean_p(n = 30, mu = 0)
-# }
-# 
-# sim_results = bind_rows(output)
 
 ```
 
