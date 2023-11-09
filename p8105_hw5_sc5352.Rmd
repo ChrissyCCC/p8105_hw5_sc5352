@@ -8,3 +8,83 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+
+```{r}
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(broom)
+```
+
+#### Problem 2
+
+```{r}
+# create dataframe to collect file names
+file_names = list.files(path = "~/Desktop/P8105/p8105_hw5_sc5352/data/", pattern = "\\.csv$", full.names = TRUE)
+data = data.frame(file_name = file_names, stringsAsFactors = FALSE)
+
+# write data from each .csv into the dataframe as a new variable
+data = 
+  data |>
+  mutate(result = map(file_name, read_csv))
+
+# tidy the id from file names to arm + subject ID
+tidynames = function(x) {
+  x = gsub(".csv$", "", x)
+}
+
+tidy_data = 
+  data |>
+  mutate(id = map(file_name, basename)) |>
+  mutate(id = map(id, tidynames)) |>
+  select(-file_name) |>
+  select(id, result) 
+
+```
+
+#### Problem 3
+```{r}
+set.seed(1)
+n = 30
+sigma = 5
+alpha = 0.05
+true_mu_values = c(0, 1, 2, 3, 4, 5, 6)
+num_simulations = 5000
+
+# Function to perform one simulation
+sim_one = function(true_mu) {
+  # Generate data
+  sim_data = tibble(
+    x = rnorm(n, mean = true_mu, sd = sigma),
+  )
+  
+  # Perform t-test
+   sim_data |> 
+      summarize(
+        mu_hat = mean(x),
+        estimate = tidy(t.test(x, mu = 0))$estimate,
+        p_value = tidy(t.test(x, mu = 0))$p.value
+        )
+  
+  # Return estimate and p-value
+  return(sim_data)
+}
+
+simulation_results =
+  map_dfr(true_mu_values, ~ {
+  simulations = replicate(num_simulations, sim_one(.x), simplify = "data.frame")
+  simulations$true_mu <- .x
+  return(simulations)
+})
+
+# output = vector("list", 5000)
+
+# for (i in 1:5000) {
+#   output[[i]] = sim_mean_p(n = 30, mu = 0)
+# }
+# 
+# sim_results = bind_rows(output)
+
+```
+
