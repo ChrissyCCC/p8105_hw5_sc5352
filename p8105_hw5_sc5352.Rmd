@@ -22,7 +22,7 @@ library(ggplot2)
 
 ```{r}
 # create dataframe to collect file names
-file_names = list.files(path = "~/Desktop/P8105/p8105_hw5_sc5352/data/", pattern = "\\.csv$", full.names = TRUE)
+file_names = list.files(path = "data", pattern = "\\.csv$", full.names = TRUE)
 data = data.frame(file_name = file_names, stringsAsFactors = FALSE)
 
 # write data from each .csv into the dataframe as a new variable
@@ -43,7 +43,7 @@ tidy_data =
   select(-file_name) |>
   select(id, result) 
 
-# unlist results columns
+# unlist results columns for plotting
 unlist_tidydata = 
   tidy_data |>
   unnest_wider(result) |>
@@ -52,6 +52,7 @@ unlist_tidydata =
                values_to = "value") |>
   mutate(id = as.character(id))
 
+# draw the plot
 df = 
   as.data.frame(unlist_tidydata) |>
   na.omit()
@@ -65,30 +66,23 @@ ggplot(df, aes(x = week, y = value, group = as.factor(id), color = as.factor(id)
 ```
 
 #### Problem 3
-```{r}
-set.seed(1)
-n = 30
-sigma = 5
-alpha = 0.05
-true_mu_values = 0
-num_simulations = 5000
 
-# Function to perform one simulation
-sim_one = function(true_mu) {
-  # Generate data
+```{r}
+# Generate 5000 datasets from the model with mu = 0
+set.seed(1)
+sim_one = function(n, mu = 0, sigma = 5) {
+  
   sim_data = tibble(
-    x = rnorm(n, mean = true_mu, sd = sigma),
+    x = rnorm(n, mean = mu, sd = sigma),
   )
   
-  # Perform t-test
-   sim_data |> 
-      summarize(
-        mu_hat = mean(x),
-        estimate = tidy(t.test(x, mu = 0))$estimate,
-        p_value = tidy(t.test(x, mu = 0))$p.value
-        )
+  sim_data |> 
+    summarize(
+      mu_hat = mean(x),
+      p_value = tidy(t.test(x, mu = 0))$p.value,
+      estimate = tidy(t.test(x, mu = 0))$estimate
+    )
 }
-
 output = vector("list", 5000)
 
 for (i in 1:5000) {
@@ -96,14 +90,54 @@ for (i in 1:5000) {
 }
 
 sim_results = bind_rows(output)
+```
 
-simulation_results =
-  map_dfr(true_mu_values, ~ {
-  simulations = replicate(num_simulations, sim_one(.x), simplify = "data.frame")
-  simulations$true_mu <- .x
-  return(simulations)
-})
+```{r}
+set.seed(2)
 
+# Design elements
 
+mu_values = c(0, 1, 2, 3, 4, 5, 6)
+
+results = data.frame()
+
+for (mu in mu_values) {
+  for (i in 1:5000) {
+    sample_data = rnorm(30, mean = mu, sd = 5)
+    test_result = tidy(t.test(sample_data, mu = 0))
+    results = rbind(results, c(mu, test_result$estimate, test_result$p.value))
+  }
+}
+
+colnames(results) = c("true_mu", "estimated_mu", "p_value")
+results =
+  results |>
+  mutate(reject_null = p_value < 0.05)
+
+power_df = 
+  results |>
+  group_by(true_mu) |>
+  summarise(power = mean(reject_null))
+
+estimated_mu = 
+  results |>
+  group_by(true_mu) |>
+  summarise(estimated_mu = mean(estimated_mu))
+
+estimated_mu_rejected = 
+  results |>
+  filter(reject_null == TRUE) |>
+  group_by(true_mu) |>
+  summarise(estimated_mu_rejected = mean(estimated_mu))
+
+# Plotting
+ggplot(power_df, aes(x = true_mu, y = power)) + 
+  geom_line() +
+  labs(title = "Power vs. True Mean", x = "True Mean (Mu)", y = "Power")
+
+ggplot() + 
+  geom_line(data = estimated_mu, aes(x = true_mu, y = estimated_mu), color = "blue") +
+  geom_line(data = estimated_mu_rejected, aes(x = true_mu, y = estimated_mu_rejected), color = "red") +
+  labs(title = "Average Estimated Mu vs. True Mean", x = "True Mean (Mu)", y = "Average Estimated Mu")
 ```
 
